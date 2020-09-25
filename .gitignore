@@ -57,3 +57,4 @@ build/
 sdkconfig
 sdkconfig.old
 .pyc
+esp32hi/main/sinesp
