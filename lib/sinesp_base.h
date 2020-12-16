@@ -20,19 +20,21 @@
 #include "esp_http_server.h"
 #include "cJSON.h"
 
-#define APP_NAME "XSerial"
+#define APP_NAME "SinESP"
 #define MAX_HTTP_BODY_SIZE 2048
 #define CONFIG_STORAGE_NAMESPACE "config"
 #define CONFIG_DEFAULT_WIFI_SSID "NOT-CMCC"
 #define CONFIG_DEFAULT_WIFI_PASSWORD "qwe123!@#"
-#define CONFIG_TYPE_VERSION 0x0003
+#define CONFIG_TYPE_VERSION 0x0006
 #define TOGGLE_VALUE(var, v1, v2) (var = (var) == (v1)? (v2): (v2))
 
 typedef struct
 {
     // Start 必须保留
-    int version;
-    int updated;
+    int version;    // 版本信息
+    int updated;    // 保存计数
+    int loaded; // 加载次数
+    int hashval;   // 设置数据哈希值
     size_t size;
     char app_version[16];
     // End 必须保留

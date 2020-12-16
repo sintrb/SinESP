@@ -86,12 +86,11 @@ esp_err_t sinesp_load_config(void)
         sinesp_update_config_with_json_string(jsonbuf);
         free(jsonbuf);
     }
-    // if (!sinespConfigJson)
-    // {
-    //     sinespConfigJson = cJSON_CreateObject();
-    // }
-
-    // Close
+    if (!sinespConfigJson)
+    {
+        sinespConfigJson = cJSON_CreateObject();
+    }
+    ++sinespConfigBase.loaded;
     nvs_close(nvs_hd);
 
     return ESP_OK;
@@ -110,13 +109,11 @@ esp_err_t sinesp_save_config(void)
 
     ++sinespConfigBase.updated;
 
-    cJSON_AddStringToObject(sinespConfigJson, "ttt", "Hello");
-
     const char *jsonbuf = cJSON_PrintUnformatted(sinespConfigJson);
     if (jsonbuf)
     {
         sinespConfigBase.size = strlen(jsonbuf);
-        ESP_LOGI(TAG, "Save JSON: %s", jsonbuf);
+        ESP_LOGI(TAG, "Save JSON(HASH=%04x, LEN=%d): %s", 0, sinespConfigBase.size, jsonbuf);
         err = nvs_set_blob(nvs_hd, CONFIG_STORAGE_KEY_JSON, jsonbuf, strlen(jsonbuf));
         if (err != ESP_OK)
             return err;

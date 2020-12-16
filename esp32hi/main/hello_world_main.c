@@ -16,6 +16,7 @@
 #include "sinesp/sinesp_gpio.h"
 #include "sinesp/sinesp_wifi.h"
 #include "sinesp/sinesp_http.h"
+#include "sinesp/sinesp_oled.h"
 
 #define CONFIG_EXAMPLE_MDNS_HOST_NAME "sinesp"
 #define MDNS_INSTANCE "esp home web server"
@@ -50,6 +51,7 @@ void app_main()
 
     sinesp_init_gpio();
     sinesp_led_set_time(1000, 0);
+    sinesp_oled_init();
 
     ESP_ERROR_CHECK(sinesp_load_config());
 

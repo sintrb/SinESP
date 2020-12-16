@@ -174,7 +174,6 @@ esp_err_t sinesp_wifi_init_with_config(int ap)
             pswd = NULL;
         }
     }
-
     if (sinespConfigJson)
     {
         cJSON *wifi = cJSON_GetObjectItem(sinespConfigJson, "ap");
@@ -188,7 +187,7 @@ esp_err_t sinesp_wifi_init_with_config(int ap)
     {
         ssid = ESP_WIFI_AP_SSID;
     }
-    if (sinesp_is_key_down())
+    if (sinesp_is_key_down() || !pswd)
         pswd = "";
     ESP_LOGI(TAG, "init Wi-Fi with AP");
     return sinesp_wifi_init_softap(ssid, pswd);
