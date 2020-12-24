@@ -166,6 +166,7 @@ esp_err_t sinesp_wifi_init_with_config(int ap)
                 ESP_LOGI(TAG, "init Wi-Fi with STA");
                 if (sinesp_wifi_connect(ssid, pswd) == ESP_OK)
                 {
+                    tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_STA, APP_NAME);
                     return ESP_OK;
                 }
                 sinesp_wifi_disconnect();
@@ -190,5 +191,6 @@ esp_err_t sinesp_wifi_init_with_config(int ap)
     if (sinesp_is_key_down() || !pswd)
         pswd = "";
     ESP_LOGI(TAG, "init Wi-Fi with AP");
+    tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_AP, APP_NAME);
     return sinesp_wifi_init_softap(ssid, pswd);
 }

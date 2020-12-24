@@ -1,11 +1,3 @@
-/* HTTP Restful API Server
-
-   This example code is in the Public Domain (or CC0 licensed, at your option.)
-
-   Unless required by applicable law or agreed to in writing, this
-   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-   CONDITIONS OF ANY KIND, either express or implied.
-*/
 #include "sinesp_http.h"
 #include "sinesp_gpio.h"
 #include "sinesp_oled.h"
@@ -55,9 +47,8 @@ esp_err_t sinesp_http_api_response(httpd_req_t *req, int code, cJSON *data, cons
         const char *jsonbuf = cJSON_PrintUnformatted(data);
         sbuf = malloc(strlen(jsonbuf) + 64);
         sprintf(sbuf, "{\"code\":%d, \"data\":%s}", code, jsonbuf);
-        free((void *)jsonbuf);
-    }
-    else
+        free((void *) jsonbuf);
+    } else
     {
         if (!msg)
         {
@@ -113,8 +104,7 @@ static esp_err_t getConfig(httpd_req_t *req)
     if (sinespConfigJson)
     {
         sinesp_http_api_response_data(req, sinespConfigJson);
-    }
-    else
+    } else
     {
         sinesp_http_api_response_error(req, "Failed to get config");
     }
@@ -164,38 +154,85 @@ static esp_err_t sendOledData(httpd_req_t *req)
         ESP_LOGI(TAG, "POST: %s", buf);
         uint8_t *data = malloc(MAX_HTTP_BODY_SIZE);
         uint8_t d;
-        int i = 0;
-        while (buf[i] && buf[i + 1])
+        int i = 0, len = 0;
+        while (buf[i] && buf[i + 1] && i < MAX_HTTP_BODY_SIZE)
         {
             d = (hex_to_u8(buf[i]) << 4) | hex_to_u8(buf[i + 1]);
             data[i / 2] = d;
             i += 2;
+            ++len;
             // OLED_Set_All(d);
         }
-        ESP_LOGI(TAG, "DATA LEN=%d [0]=%02x", i / 2, data[0]);
-        // uint8_t data[] = {0xFF, 0xF0, 0x0F, 0xAA, 0x44};
-        // for(int n=0; n< 8; ++n){
-        //     sinesp_oled_send_data(0, n, data, i / 2);
-        // }
-        // sinesp_oled_send_data(0, 0, data, i / 2);
+        ESP_LOGI(TAG, "DATA LEN=%d [0]=%02x", len, data[0]);
+        // i = 0;
+        for (i = 0; i < 8; ++i)
+        {
+            sinesp_oled_send_data(0, i, data + (i * 128), 128);
+        }
+        // sinesp_oled_send_data(0, 0, data, len);
+        free(data);
     }
-    // sinesp_http_api_response_error(req, "Failed to save config");
+    sinesp_http_api_response_error(req, "OK!");
     free(buf);
     return ESP_OK;
 }
 
+
+static esp_err_t setOledImage(httpd_req_t *req)
+{
+    // 设置OLED屏幕图片
+    char *buf = malloc(MAX_HTTP_BODY_SIZE);
+    char len = 0;
+    if (sinesp_http_read_all_req_data(req, buf, MAX_HTTP_BODY_SIZE) == ESP_OK)
+    {
+        ESP_LOGI(TAG, "POST: LEN=%d", req->content_len);
+        uint8_t *data = malloc(MAX_HTTP_BODY_SIZE);
+        uint8_t d;
+        int i = 0;
+        while (buf[i] && buf[i + 1] && i < MAX_HTTP_BODY_SIZE)
+        {
+            d = (hex_to_u8(buf[i]) << 4) | hex_to_u8(buf[i + 1]);
+            data[i / 2] = d;
+            i += 2;
+            ++len;
+        }
+        sinesp_oled_set_image(data[0], data + 1);
+        free(data);
+    }
+    sinesp_http_api_response_error(req, "OK!");
+    free(buf);
+    return ESP_OK;
+}
+
+
+static esp_err_t oledTicks(httpd_req_t *req)
+{
+    sinesp_oled_ticks();
+    sinesp_http_api_response_error(req, "OK!");
+    return ESP_OK;
+}
+
+#include "esp_sleep.h"
+static esp_err_t testSleep(httpd_req_t *req)
+{
+    esp_sleep_enable_timer_wakeup(20 * 1000000);
+    esp_deep_sleep_start();
+    sinesp_http_api_response_error(req, "OK!");
+    return ESP_OK;
+}
+
 #define HTTP_URI_MAPPING(_uri, _handle, _method)   \
-    ESP_LOGI(TAG, "Uri %s -> %s", _uri, #_handle); \
+    do{ESP_LOGI(TAG, "Uri %s -> %s", _uri, #_handle); \
     httpd_uri_t _handle##uri = {                   \
         .uri = _uri,                               \
         .method = _method,                         \
         .handler = _handle,                        \
     };                                             \
-    httpd_register_uri_handler(server, &_handle##uri);
+    httpd_register_uri_handler(server, &_handle##uri);}while (0);
 
 #define HTTP_GET_MAPPING(_uri, _handle) HTTP_URI_MAPPING(_uri, _handle, HTTP_GET)
 #define HTTP_POST_MAPPING(_uri, _handle) HTTP_URI_MAPPING(_uri, _handle, HTTP_POST)
-#define HTTP_API(_mth) HTTP_POST_MAPPING("/api/" #_mth, _mth)
+#define HTTP_API(_mth) HTTP_POST_MAPPING("/api/" #_mth, _mth); //HTTP_GET_MAPPING("/api/" #_mth, _mth);
 
 esp_err_t httpd_open(httpd_handle_t hd, int sockfd)
 {
@@ -217,19 +254,20 @@ esp_err_t sinesp_start_http_server()
         goto err_start;
     }
 
-    // 系统状态
+    // 接口
     HTTP_API(getStatus);
-
-    // 系统设置
     HTTP_API(getConfig);
     HTTP_API(setConfig);
     HTTP_API(sendOledData);
+    HTTP_API(setOledImage);
+    HTTP_API(oledTicks);
+    HTTP_API(testSleep);
 
     // 首页
     HTTP_GET_MAPPING("/", handle_get_index);
     set_led_with_config();
     return ESP_OK;
-err_start:
+    err_start:
     // free(rest_context);
     //     server = NULL;
     // err:

@@ -1,6 +1,7 @@
 #include "sinesp_base.h"
 #include "sinesp_gpio.h"
-static const char* TAG = "base";
+
+static const char *TAG = "base";
 
 sinesp_config_base_t sinespConfigBase = {0};
 cJSON *sinespConfigJson = NULL;
@@ -46,53 +47,55 @@ esp_err_t sinesp_load_config(void)
     nvs_handle_t nvs_hd;
     esp_err_t err;
     memset(&sinespConfigBase, 0, sizeof(sinespConfigBase));
-
+    uint8_t opened = 0;
     // Open
     err = nvs_open(CONFIG_STORAGE_NAMESPACE, NVS_READONLY, &nvs_hd);
-    if (err != ESP_OK)
-        return err;
-    // Read
-    size_t size = sizeof(sinespConfigBase);
-    err = nvs_get_blob(nvs_hd, STORE_CONFIG_KEY_BASE, &sinespConfigBase, &size);
-    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
-        return err;
-
-    if (sinespConfigBase.version != CONFIG_TYPE_VERSION)
+    if (err == ESP_OK)
     {
-        // 初始化设置
-        memset(&sinespConfigBase, 0, sizeof(sinespConfigBase));
-        sinespConfigBase.version = CONFIG_TYPE_VERSION;
-        ESP_LOGI(TAG, "Init config with default!");
-    }
-    else
-    {
-        ESP_LOGI(TAG, "Load config success!");
+        opened = 1;
+        // Read
+        size_t size = sizeof(sinespConfigBase);
+        err = nvs_get_blob(nvs_hd, STORE_CONFIG_KEY_BASE, &sinespConfigBase, &size);
+        if (err == ESP_OK)
+        {
+            if (sinespConfigBase.version != CONFIG_TYPE_VERSION)
+            {
+                // 初始化设置
+                memset(&sinespConfigBase, 0, sizeof(sinespConfigBase));
+                sinespConfigBase.version = CONFIG_TYPE_VERSION;
+                ESP_LOGI(TAG, "Init config with default!");
+            } else
+            {
+                ESP_LOGI(TAG, "Load config success!");
+            }
+        }
     }
 
     if (sinespConfigBase.size > 0)
     {
         // 存在设置项目
         char *jsonbuf = malloc(sinespConfigBase.size + 1);
-        if (!jsonbuf)
+        if (jsonbuf)
+        {
+            err = nvs_get_blob(nvs_hd, CONFIG_STORAGE_KEY_JSON, jsonbuf, &sinespConfigBase.size);
+            if (err == ESP_OK)
+            {
+                jsonbuf[sinespConfigBase.size] = '\0';
+                sinesp_update_config_with_json_string(jsonbuf);
+            }
+            free(jsonbuf);
+        } else
         {
             ESP_LOGI(TAG, "malloc error");
-            return ESP_FAIL;
         }
-
-        err = nvs_get_blob(nvs_hd, CONFIG_STORAGE_KEY_JSON, jsonbuf, &sinespConfigBase.size);
-        if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
-            return err;
-        jsonbuf[sinespConfigBase.size] = '\0';
-        sinesp_update_config_with_json_string(jsonbuf);
-        free(jsonbuf);
     }
     if (!sinespConfigJson)
     {
         sinespConfigJson = cJSON_CreateObject();
     }
     ++sinespConfigBase.loaded;
-    nvs_close(nvs_hd);
-
+    if (opened)
+        nvs_close(nvs_hd);
     return ESP_OK;
 }
 
@@ -117,9 +120,8 @@ esp_err_t sinesp_save_config(void)
         err = nvs_set_blob(nvs_hd, CONFIG_STORAGE_KEY_JSON, jsonbuf, strlen(jsonbuf));
         if (err != ESP_OK)
             return err;
-        free((void *)jsonbuf);
-    }
-    else
+        free((void *) jsonbuf);
+    } else
     {
         sinespConfigBase.size = 0;
     }
